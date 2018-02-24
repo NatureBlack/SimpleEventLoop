@@ -23,7 +23,7 @@ int64_t EventLoop::Start()
 
     mThreadStopRequest = false;
 
-    mThread = new std::thread(std::bind(&EventLoop::MainLoop, this));
+    mThread = new thread(std::bind(&EventLoop::MainLoop, this));
     if(mThread == nullptr)
     {
         return static_cast<int64_t>(-2);

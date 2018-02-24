@@ -14,6 +14,7 @@ typedef enum
     EVENT_ID_1,
     EVENT_ID_2,
     EVENT_ID_3,
+    EVENT_ID_4,
 } EVENT_ID;
 
 void Event0Func()
@@ -37,6 +38,13 @@ void Event3Func(EventLoop* el)
     el->Post(EVENT_ID_3, el);
 }
 
+void Event4Func(EventLoop* el)
+{
+    fprintf(stdout, "L%d::%s\n", __LINE__, __FUNCTION__);
+    el->Post(EVENT_ID_4, el);
+}
+
+
 class test
 {
 public:
@@ -49,7 +57,7 @@ public:
     int rr;
 };
 
-void testRef(test t1, test& t2, test&& t3)
+void testRef(test t1, const test& t2, test&& t3)
 {
     cout << "add t1: " << &t1 << endl;
     cout << "add t2: " << &t2 << endl;
@@ -70,6 +78,8 @@ int main(int argc, char** argv) {
     gEventLoop.Register(EVENT_ID_1, gEvent1Func);
     gEventLoop.Register(EVENT_ID_2, gEvent2Func);
     gEventLoop.Register(EVENT_ID_3, function<void(EventLoop*)>(Event3Func));
+    gEventLoop.Register(EVENT_ID_4, function<void(EventLoop*)>(Event4Func));
+
 
     gEventLoop.Start();
 
@@ -79,7 +89,9 @@ int main(int argc, char** argv) {
     gEventLoop.Post(EVENT_ID_2, std::string("Hello World Again!"), 12345);
     gEventLoop.Post(EVENT_ID_1, 452.361);
     gEventLoop.Post(EVENT_ID_0);
-    //gEventLoop.Post(EVENT_ID_3, &gEventLoop);
+    gEventLoop.Post(EVENT_ID_3, &gEventLoop);
+    gEventLoop.Post(EVENT_ID_4, &gEventLoop);
+
 
     while(true);
 
