@@ -27,7 +27,7 @@ void Event1Func(double value)
     fprintf(stdout, "L%d::%s - %lf\n", __LINE__, __FUNCTION__, value);
 }
 
-void Event2Func(std::string str, int value) 
+void Event2Func(string str, int value) 
 {
     fprintf(stdout, "L%d::%s - %s %d\n", __LINE__, __FUNCTION__, str.c_str(), value);
 }
@@ -83,19 +83,16 @@ int main(int argc, char** argv) {
 
     gEventLoop.Start();
 
-    gEventLoop.Post(EVENT_ID_2, std::string("Hello World!"), 1234);
+    gEventLoop.Post(EVENT_ID_2, string("Hello World!"), 1234);
     gEventLoop.Post(EVENT_ID_0);
     gEventLoop.Post(EVENT_ID_1, 42.31);
-    gEventLoop.Post(EVENT_ID_2, std::string("Hello World Again!"), 12345);
+    gEventLoop.Post(EVENT_ID_2, string("Hello World Again!"), 12345);
     gEventLoop.Post(EVENT_ID_1, 452.361);
     gEventLoop.Post(EVENT_ID_0);
     gEventLoop.Post(EVENT_ID_3, &gEventLoop);
     gEventLoop.Post(EVENT_ID_4, &gEventLoop);
 
-
-    while(true);
-
-    gEventLoop.Stop();
+    gEventLoop.Stop(true);
 
     cout << "DONE." << endl;
 

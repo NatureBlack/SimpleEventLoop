@@ -5,7 +5,8 @@
 using namespace std;
 
 EventLoop::EventLoop()
-    : mThread(nullptr), mThreadStopRequest(true)
+    : mThread(nullptr), mThreadStopRequest(true),
+    mThreadFinishQueueRequest(true)
 {
 }
 
@@ -22,8 +23,9 @@ int64_t EventLoop::Start()
     }
 
     mThreadStopRequest = false;
+    mThreadFinishQueueRequest = false;
 
-    mThread = new thread(std::bind(&EventLoop::MainLoop, this));
+    mThread = new thread(bind(&EventLoop::MainLoop, this));
     if(mThread == nullptr)
     {
         return static_cast<int64_t>(-2);
@@ -32,9 +34,16 @@ int64_t EventLoop::Start()
     return static_cast<int64_t>(0);
 }
 
-void EventLoop::Stop() 
+void EventLoop::Stop(bool finishQueue) 
 {
-    mThreadStopRequest = true;
+    if(finishQueue)
+    {
+        mThreadFinishQueueRequest = true;
+    }
+    else
+    {
+        mThreadStopRequest = true;
+    }
 
     mEventQueueCondition.notify_one();
 
@@ -57,11 +66,13 @@ void EventLoop::Stop()
         delete static_cast<EventHandlerBase*>(eventHandlerMapIter->second);
     }
     mEventHandlerMap.clear();
+
+    mThreadStopRequest = true;
 }
 
 void EventLoop::ClearAll()
 {
-    std::unique_lock<std::mutex> scopedLock(mEventQueueMutex);
+    unique_lock<mutex> scopedLock(mEventQueueMutex);
     while(!mEventQueue.empty())
     {
         EventBase* eventIter = mEventQueue.front();
@@ -76,14 +87,16 @@ void EventLoop::MainLoop()
 
     while(!mThreadStopRequest)
     {
-        std::unique_lock<std::mutex> scopedLock(mEventQueueMutex);
+        unique_lock<mutex> spinLock(mEventLoopMutex);
         if(mEventQueue.empty())
         {
-            mEventQueueCondition.wait(scopedLock);
+            if(mThreadFinishQueueRequest) break;
+            mEventQueueCondition.wait(spinLock);
         }
             
         if(mThreadStopRequest) break;
 
+        unique_lock<mutex> scopedLock(mEventQueueMutex);
         if(!mEventQueue.empty())
         {
             event = mEventQueue.front();

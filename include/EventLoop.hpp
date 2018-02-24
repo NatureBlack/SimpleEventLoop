@@ -19,7 +19,7 @@ public:
     virtual ~EventLoop();
 
     int64_t Start();
-    void Stop();
+    void Stop(bool finishQueue = false);
 
     template <typename... Args>
     int64_t Register(int64_t aEventId, const std::function<void(Args...)>& aEventHandler)
@@ -45,7 +45,7 @@ public:
     template <typename... Args>
     int64_t Post(int64_t aEventId, Args&&... aArgs) 
     {
-        if(mThreadStopRequest)
+        if(mThreadStopRequest || mThreadFinishQueueRequest)
         {
             return static_cast<int64_t>(-1);
         }
@@ -140,11 +140,12 @@ private:
 
     std::unordered_map<int64_t, EventHandlerBase*> mEventHandlerMap;
     std::queue<EventBase*> mEventQueue;
-    std::mutex mEventQueueMutex;
+    std::mutex mEventQueueMutex, mEventLoopMutex;
     std::condition_variable mEventQueueCondition;
 
     std::thread* mThread;
     bool mThreadStopRequest;
+    bool mThreadFinishQueueRequest;
 };
 
 #endif // EVENTLOOP_EVENTLOOP_HPP
