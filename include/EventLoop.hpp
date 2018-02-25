@@ -55,8 +55,7 @@ public:
         auto eventHandlerMapIter = mEventHandlerMap.find(aEventId);
         if(eventHandlerMapIter != mEventHandlerMap.end())
         {
-            mEventQueueMutex.lock();
-
+            unique_lock<mutex> scopedLock(mEventQueueMutex);
             EventBase* event = new Event<Args...>(aEventId, eventHandlerMapIter->second, std::forward<Args>(aArgs)...);
             if(event != nullptr)
             {
@@ -67,8 +66,6 @@ public:
             {
                 result = static_cast<int64_t>(-2);
             }
-
-            mEventQueueMutex.unlock();
         }
         else
         {
@@ -92,28 +89,26 @@ private:
     class EventHandler : public EventHandlerBase
     {
     public:
-        const std::function<void(Args...)> mFunc;
-
-    public:
         EventHandler(const std::function<void(Args...)>& aFunc)
-            : EventHandlerBase(),
-            mFunc(aFunc) {}
+            : EventHandlerBase(), mFunc(aFunc) {}
         virtual ~EventHandler() {}
+    
+    public:
+        const std::function<void(Args...)> mFunc;
     };
 
     class EventBase
     {
     public:
-        int64_t mEventId;
-        EventHandlerBase* mEventHandler;
+        EventBase(int64_t aEventId)
+            : mEventId(aEventId) {}
 
-    public:
-        EventBase(int64_t aEventId, EventHandlerBase* aEventHandler)
-            : mEventId(aEventId),
-            mEventHandler(aEventHandler) {}
         virtual ~EventBase() {}
 
         virtual void doEvent() {}
+    
+    private:
+        int64_t mEventId;
     };
 
     template <typename... Args>
@@ -121,8 +116,8 @@ private:
     {
     public:
         Event(int64_t aEventId, EventHandlerBase* aEventHandler, Args&&... aArgs)
-            : EventBase(aEventId, aEventHandler),
-            mEventFunc(std::bind(((EventHandler<Args...>*)aEventHandler)->mFunc, 
+            : EventBase(aEventId),
+            mEventFunc(std::bind(dynamic_cast<EventHandler<Args...>*>(aEventHandler)->mFunc, 
                 std::forward<Args>(aArgs)...)) {}
 
         virtual ~Event() {}
@@ -132,8 +127,8 @@ private:
             mEventFunc();
         }
 
-    public:
-        std::function<void()> mEventFunc;
+    private:
+        const std::function<void()> mEventFunc;
     };
 
     virtual void MainLoop();
