@@ -55,7 +55,7 @@ public:
         auto eventHandlerMapIter = mEventHandlerMap.find(aEventId);
         if(eventHandlerMapIter != mEventHandlerMap.end())
         {
-            unique_lock<mutex> scopedLock(mEventQueueMutex);
+            std::unique_lock<std::mutex> scopedLock(mEventQueueMutex);
             EventBase* event = new Event<Args...>(aEventId, eventHandlerMapIter->second, std::forward<Args>(aArgs)...);
             if(event != nullptr)
             {
