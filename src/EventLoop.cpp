@@ -59,20 +59,13 @@ void EventLoop::Stop(bool finishQueue)
     }
 
     ClearAll();
-    for(auto eventHandlerMapIter = mEventHandlerMap.begin();
-        eventHandlerMapIter != mEventHandlerMap.end();
-        ++eventHandlerMapIter) 
-    {
-        delete static_cast<EventHandlerBase*>(eventHandlerMapIter->second);
-    }
-    mEventHandlerMap.clear();
 
     mThreadStopRequest = true;
 }
 
 void EventLoop::ClearAll()
 {
-    unique_lock<mutex> scopedLock(mEventQueueMutex);
+    lock_guard<mutex> scopedLock(mEventQueueMutex);
     while(!mEventQueue.empty())
     {
         EventBase* eventIter = mEventQueue.front();
@@ -87,22 +80,21 @@ void EventLoop::MainLoop()
 
     while(!mThreadStopRequest)
     {
-        unique_lock<mutex> spinLock(mEventLoopMutex);
-        if(mEventQueue.empty())
+        // scopedLock for event queue
         {
-            if(mThreadFinishQueueRequest) break;
-            mEventQueueCondition.wait(spinLock);
-        }
-            
-        if(mThreadStopRequest) break;
+            unique_lock<mutex> scopedLock(mEventQueueMutex);
+            if(mEventQueue.empty())
+            {
+                if(mThreadFinishQueueRequest) break;
+                mEventQueueCondition.wait(scopedLock, [this]{ return !mEventQueue.empty(); });
+            }
 
-        unique_lock<mutex> scopedLock(mEventQueueMutex);
-        if(!mEventQueue.empty())
-        {
-            event = mEventQueue.front();
-            mEventQueue.pop();
+            if(!mEventQueue.empty())
+            {
+                event = mEventQueue.front();
+                mEventQueue.pop();
+            }
         }
-        scopedLock.unlock();
 
         if(event != nullptr)
         {

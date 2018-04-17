@@ -8,14 +8,41 @@
 
 using namespace std;
 
-typedef enum 
+class test
 {
-    EVENT_ID_0,
-    EVENT_ID_1,
-    EVENT_ID_2,
-    EVENT_ID_3,
-    EVENT_ID_4,
-} EVENT_ID;
+public:
+    test() : rr(0)
+    {
+        cout << this << endl;
+        cout << "construct" << endl;
+    }
+
+    test(const test& t) : rr(t.rr)
+    {
+        cout << "copy construct" << endl;
+    }
+
+    test& operator=(const test& t)
+    {
+        rr = t.rr;
+        cout << "copy assignment" << endl;
+        return (*this);
+    }
+
+    test(test&& t) : rr(t.rr)
+    {
+        cout << "move construct" << endl;
+    }
+
+    test& operator=(test&& t)
+    {
+        rr = t.rr;
+        cout << "move assignment" << endl;
+        return (*this);
+    }
+
+    int rr;
+};
 
 void Event0Func()
 {
@@ -35,27 +62,25 @@ void Event2Func(string str, int value)
 void Event3Func(EventLoop* el)
 {
     fprintf(stdout, "L%d::%s\n", __LINE__, __FUNCTION__);
-    el->Post(EVENT_ID_3, el);
+    el->Post([=]{Event3Func(el);});
 }
 
 void Event4Func(EventLoop* el)
 {
     fprintf(stdout, "L%d::%s\n", __LINE__, __FUNCTION__);
-    el->Post(EVENT_ID_4, el);
+    el->Post([=]{Event4Func(el);});
 }
 
-
-class test
+void Event5Func(test t)
 {
-public:
-    test()
-    {
-        this->rr = 666;
-        cout << this << endl;
-    }
+    fprintf(stdout, "L%d::%s\n", __LINE__, __FUNCTION__);
+    cout << t.rr << endl;
+}
 
-    int rr;
-};
+test get_test()
+{
+    return test();
+}
 
 void testRef(test t1, const test& t2, test&& t3)
 {
@@ -68,30 +93,44 @@ int main(int argc, char** argv) {
     cout << "BEGIN" << endl;
 
     testRef(test(), test(), test());
+    test t0;
+    test t1(t0);
+    test t2 = t0;
+    test t3 = test();
+    test t4 = get_test();
+    test t5 = move(get_test());
+    t1 = t0;
+    t1 = test();
+    t1 = get_test();
 
     EventLoop gEventLoop;
 
     function<void()> gEvent0Func = Event0Func;
     function<void(double)> gEvent1Func = bind(Event1Func, placeholders::_1);
     function<void(string, int)> gEvent2Func = bind(Event2Func, placeholders::_1, placeholders::_2);
-    gEventLoop.Register(EVENT_ID_0, gEvent0Func);
-    gEventLoop.Register(EVENT_ID_1, gEvent1Func);
-    gEventLoop.Register(EVENT_ID_2, gEvent2Func);
-    gEventLoop.Register(EVENT_ID_3, function<void(EventLoop*)>(Event3Func));
-    gEventLoop.Register(EVENT_ID_4, function<void(EventLoop*)>(Event4Func));
-
+    function<void(string)> gEvent22Func = bind(Event2Func, placeholders::_1, 54321);
+    function<void(test)> gEvent5Func = bind(Event5Func, placeholders::_1);
 
     gEventLoop.Start();
 
-    gEventLoop.Post(EVENT_ID_2, string("Hello World!"), 1234);
-    gEventLoop.Post(EVENT_ID_0);
-    gEventLoop.Post(EVENT_ID_1, 42.31);
-    gEventLoop.Post(EVENT_ID_2, string("Hello World Again!"), 12345);
-    gEventLoop.Post(EVENT_ID_1, 452.361);
-    gEventLoop.Post(EVENT_ID_0);
-    gEventLoop.Post(EVENT_ID_3, &gEventLoop);
-    gEventLoop.Post(EVENT_ID_4, &gEventLoop);
+    gEventLoop.Post(bind(gEvent2Func, string("Hello World!"), 1234));
+    gEventLoop.Post(bind(gEvent22Func, string("Hello World Again!")));
 
+    gEventLoop.Post(gEvent0Func);
+    gEventLoop.Post(Event0Func);
+
+    gEventLoop.Post(bind(Event1Func, 42.31));
+    gEventLoop.Post([=]{gEvent1Func(452.361);});
+    gEventLoop.Post([=]{Event1Func(452.361e10);});
+    
+    //gEventLoop.Post(bind(Event3Func, &gEventLoop));
+    //gEventLoop.Post(bind(Event4Func, &gEventLoop));
+
+    gEventLoop.Post(bind(Event5Func, test()));
+    gEventLoop.Post(bind(gEvent5Func, test()));
+    gEventLoop.Post([=]{gEvent5Func(test());});
+
+    while(true);
     gEventLoop.Stop(true);
 
     cout << "DONE." << endl;
