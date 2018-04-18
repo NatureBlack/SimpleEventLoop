@@ -73,8 +73,7 @@ void Event4Func(EventLoop* el)
 
 void Event5Func(test t)
 {
-    fprintf(stdout, "L%d::%s\n", __LINE__, __FUNCTION__);
-    cout << t.rr << endl;
+    fprintf(stdout, "L%d::%s - %d\n", __LINE__, __FUNCTION__, t.rr);
 }
 
 test get_test()
@@ -103,7 +102,7 @@ int main(int argc, char** argv) {
     t1 = test();
     t1 = get_test();
 
-    EventLoop gEventLoop(1);
+    EventLoop gEventLoop(5);
 
     function<void()> gEvent0Func = Event0Func;
     function<void(double)> gEvent1Func = bind(Event1Func, placeholders::_1);
@@ -123,8 +122,8 @@ int main(int argc, char** argv) {
     gEventLoop.Post([=]{gEvent1Func(452.361);});
     gEventLoop.Post([=]{Event1Func(452.361e10);});
     
-    //gEventLoop.Post(bind(Event3Func, &gEventLoop));
-    //gEventLoop.Post(bind(Event4Func, &gEventLoop));
+    gEventLoop.Post(bind(Event3Func, &gEventLoop));
+    gEventLoop.Post(bind(Event4Func, &gEventLoop));
     gEventLoop.Post([&]{Event4Func(&gEventLoop);});
 
     //gEventLoop.Post(bind(Event5Func, test()));
