@@ -1,13 +1,17 @@
 #include <iostream>
+#include <algorithm>
+#include <cassert>
 
 #include <EventLoop.hpp>
 
 using namespace std;
 
-EventLoop::EventLoop()
-    : mThread(nullptr), mThreadStopRequest(true),
+EventLoop::EventLoop(size_t _numThreads)
+    : numThreads(_numThreads), 
+    mThreadStopRequest(true),
     mThreadFinishQueueRequest(true)
 {
+    assert(_numThreads > 0);
 }
 
 EventLoop::~EventLoop()
@@ -17,18 +21,12 @@ EventLoop::~EventLoop()
 
 int64_t EventLoop::Start()
 {
-    if(mThread != nullptr)
-    {
-        return static_cast<int64_t>(-2);
-    }
-
     mThreadStopRequest = false;
     mThreadFinishQueueRequest = false;
 
-    mThread = new thread(bind(&EventLoop::MainLoop, this));
-    if(mThread == nullptr)
+    for(size_t i = 0; i < numThreads; ++i)
     {
-        return static_cast<int64_t>(-2);
+        mThreads.emplace_back(new thread([this]{MainLoop();}));
     }
 
     return static_cast<int64_t>(0);
@@ -45,17 +43,17 @@ void EventLoop::Stop(bool finishQueue)
         mThreadStopRequest = true;
     }
 
-    mEventQueueCondition.notify_one();
+    mEventQueueCondition.notify_all();
 
-    if(mThread != nullptr) 
+    if(!mThreads.empty()) 
     {
-        if(mThread->joinable()) 
+        for(auto mThread : mThreads)
         {
-            mThread->join();
+            if(mThread->joinable())
+            {
+                mThread->join();
+            }
         }
-
-        delete mThread;
-        mThread = nullptr;
     }
 
     ClearAll();
@@ -68,15 +66,13 @@ void EventLoop::ClearAll()
     lock_guard<mutex> scopedLock(mEventQueueMutex);
     while(!mEventQueue.empty())
     {
-        EventBase* eventIter = mEventQueue.front();
         mEventQueue.pop();
-        delete eventIter;
     }
 }
 
 void EventLoop::MainLoop()
 {
-    EventBase* event = nullptr;
+    shared_ptr<EventBase> event = nullptr;
 
     while(!mThreadStopRequest)
     {
@@ -86,7 +82,10 @@ void EventLoop::MainLoop()
             if(mEventQueue.empty())
             {
                 if(mThreadFinishQueueRequest) break;
-                mEventQueueCondition.wait(scopedLock, [this]{ return !mEventQueue.empty(); });
+                mEventQueueCondition.wait(scopedLock,
+                    [this]{return !mEventQueue.empty() ||
+                        mThreadFinishQueueRequest ||
+                        mThreadStopRequest;});
             }
 
             if(!mEventQueue.empty())
@@ -99,8 +98,6 @@ void EventLoop::MainLoop()
         if(event != nullptr)
         {
             event->doEvent();
-            delete event;
-            event = nullptr;
         }
     }
 }

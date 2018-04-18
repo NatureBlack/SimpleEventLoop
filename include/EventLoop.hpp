@@ -13,8 +13,8 @@
 
 class EventLoop
 {
-public:
-    EventLoop();
+public: 
+    EventLoop(size_t numThreads = 1);
     virtual ~EventLoop();
 
     int64_t Start();
@@ -70,11 +70,12 @@ private:
 
     virtual void MainLoop();
 
-    std::queue<EventBase*> mEventQueue;
+    std::queue<std::shared_ptr<EventBase>> mEventQueue;
     std::mutex mEventQueueMutex;
     std::condition_variable mEventQueueCondition;
 
-    std::thread* mThread;
+    size_t numThreads;
+    std::vector<std::shared_ptr<std::thread>> mThreads;
     bool mThreadStopRequest;
     bool mThreadFinishQueueRequest;
 };

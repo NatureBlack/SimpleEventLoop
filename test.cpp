@@ -103,7 +103,7 @@ int main(int argc, char** argv) {
     t1 = test();
     t1 = get_test();
 
-    EventLoop gEventLoop;
+    EventLoop gEventLoop(1);
 
     function<void()> gEvent0Func = Event0Func;
     function<void(double)> gEvent1Func = bind(Event1Func, placeholders::_1);
@@ -125,12 +125,14 @@ int main(int argc, char** argv) {
     
     //gEventLoop.Post(bind(Event3Func, &gEventLoop));
     //gEventLoop.Post(bind(Event4Func, &gEventLoop));
+    gEventLoop.Post([&]{Event4Func(&gEventLoop);});
 
-    gEventLoop.Post(bind(Event5Func, test()));
-    gEventLoop.Post(bind(gEvent5Func, test()));
+    //gEventLoop.Post(bind(Event5Func, test()));
+    //gEventLoop.Post(bind(gEvent5Func, test()));
     gEventLoop.Post([=]{gEvent5Func(test());});
 
     while(true);
+    //_sleep(50);
     gEventLoop.Stop(true);
 
     cout << "DONE." << endl;
